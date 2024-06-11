@@ -35,6 +35,14 @@ public struct OtoPageView<Header: View>: UIViewControllerRepresentable {
 
     public func updateUIViewController(_ pageViewController: OtoPageViewController, context: Context) {
         pageViewController.setViewController(context.coordinator.viewControllers[0], direction: .forward, animated: true)
+
+        if let navigationController = pageViewController.navigationController,
+           let targets = navigationController.interactivePopGestureRecognizer?.value(forKey: "targets") as? NSMutableArray {
+            let recognzier = UIPanGestureRecognizer()
+            recognzier.delegate = pageViewController
+            recognzier.setValue(targets, forKey: "targets")
+            pageViewController.pageScrollView?.addGestureRecognizer(recognzier)
+        }
     }
 
     public func makeCoordinator() -> Coordinator {

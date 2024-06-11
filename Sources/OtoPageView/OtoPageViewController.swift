@@ -63,6 +63,13 @@ open class OtoPageViewController: UIViewController {
         return vc
     }()
 
+    public var pageScrollView: UIScrollView? {
+        for case let scrollView as UIScrollView in pageViewController.view.subviews {
+            return scrollView
+        }
+        return nil
+    }
+
     open weak var delegate: (any Delegate)?
 
     open weak var dataSource: (any DataSource)?
@@ -148,5 +155,31 @@ extension OtoPageViewController: UIPageViewControllerDataSource {
 
     public func pageViewController(_ pageViewController: UIPageViewController, viewControllerAfter viewController: UIViewController) -> UIViewController? {
         dataSource?.pageViewController(self, viewControllerAfter: viewController)
+    }
+}
+
+extension OtoPageViewController: UIGestureRecognizerDelegate {
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let panGestureRecognizer = gestureRecognizer as? UIPanGestureRecognizer,
+              let dataSource = dataSource
+        else {
+            return false
+        }
+
+        guard let currentViewController,
+              dataSource.pageViewController(self, viewControllerBefore: currentViewController) == nil
+        else {
+            return false
+        }
+
+        let isLeftToRight = UIApplication.shared.userInterfaceLayoutDirection == .leftToRight
+        let velocity = panGestureRecognizer.velocity(in: nil)
+
+        if velocity.x * (isLeftToRight ? 1 : -1) <= 0 {
+            return false
+        }
+
+        return abs(velocity.x) > abs(velocity.y)
     }
 }
