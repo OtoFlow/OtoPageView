@@ -106,11 +106,11 @@ struct PageContentView<Content: View>: View {
     }
 }
 
-class PageHostingController<Content: View>: UIHostingController<PageContentView<Content>>, PageScrollable {
+class PageHostingController<Content: View>: UIHostingController<PageContentView<Content>>, PageScrollableController {
 
     let contentView: PageContentView<Content>
 
-    var scrollView: UIScrollView? {
+    var scrollableView: UIScrollView? {
         contentView.scrollView
     }
 

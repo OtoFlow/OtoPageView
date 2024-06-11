@@ -7,9 +7,9 @@
 
 import UIKit
 
-public protocol PageScrollable where Self: UIViewController {
+public protocol PageScrollableController: UIViewController {
 
-    var scrollView: UIScrollView? { get }
+    var scrollableView: UIScrollView? { get }
 }
 
 open class OtoPageViewController: UIViewController {
@@ -51,7 +51,11 @@ open class OtoPageViewController: UIViewController {
     }()
 
     public var currentScrollView: UIScrollView? {
-        (pageViewController.viewControllers?.first as? PageScrollable)?.scrollView
+        (currentViewController as? PageScrollableController)?.scrollableView
+    }
+
+    public var currentViewController: UIViewController? {
+        pageViewController.viewControllers?.first
     }
 
     private var pageOrigin: CGPoint = .zero
@@ -76,9 +80,12 @@ open class OtoPageViewController: UIViewController {
 
     public let supplymentaries: [NonScrollView.Supplementary]
 
+    private var contentSizeObservation: NSKeyValueObservation?
+    private var contentInsetObservation: NSKeyValueObservation?
+
     public convenience init(header: UIView, height: CGFloat) {
         self.init(supplymentaries: [
-            .header(header, height: height)
+            .header(header, height: height),
         ])
     }
 
@@ -112,10 +119,28 @@ open class OtoPageViewController: UIViewController {
     ) {
         pageViewController.setViewControllers([viewController], direction: direction, animated: animated)
 
-        mainScrollView.invalidateLayout()
-
         DispatchQueue.main.async {
-            (viewController as? PageScrollable)?.scrollView?.isScrollEnabled = false
+            (viewController as? PageScrollableController)?.scrollableView?.isScrollEnabled = false
+        }
+
+        observeCurrentScrollViewContentIfNeeded()
+    }
+
+    private func observeCurrentScrollViewContentIfNeeded() {
+        contentSizeObservation?.invalidate()
+        contentSizeObservation = currentScrollView?.observe(\.contentSize, options: [.new, .old, .initial]) { [unowned self] _, contentSize in
+            if contentSize.oldValue == contentSize.newValue {
+                return
+            }
+            mainScrollView.invalidateLayout()
+        }
+
+        contentInsetObservation?.invalidate()
+        contentInsetObservation = currentScrollView?.observe(\.contentInset, options: [.new, .old, .initial]) { [unowned self] _, contentInset in
+            if contentInset.oldValue == contentInset.newValue {
+                return
+            }
+            mainScrollView.invalidateLayout()
         }
     }
 }
@@ -137,13 +162,13 @@ extension OtoPageViewController {
 extension OtoPageViewController: UIPageViewControllerDelegate {
 
     public func pageViewController(_ pageViewController: UIPageViewController, didFinishAnimating finished: Bool, previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
-        for case let vc as PageScrollable in pageViewController.viewControllers ?? [] {
+        for case let vc as PageScrollableController in pageViewController.viewControllers ?? [] {
             DispatchQueue.main.async {
-                vc.scrollView?.isScrollEnabled = false
+                vc.scrollableView?.isScrollEnabled = false
             }
         }
 
-        mainScrollView.invalidateLayout()
+        observeCurrentScrollViewContentIfNeeded()
     }
 }
 
