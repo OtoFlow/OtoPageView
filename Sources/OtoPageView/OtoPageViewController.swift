@@ -15,18 +15,18 @@ public protocol PageScrollableController: UIViewController {
 open class OtoPageViewController: UIViewController {
 
     public lazy var mainScrollView: NonScrollView = {
-        let pinnedHeight = supplymentaries.reduce(0.0) { max($0, $1.placement.intrinsicPinnedHeight) }
-        let contentHeight = supplymentaries.reduce(0.0) { $0 + $1.placement.intrinsicHeight }
-        pageOrigin = CGPoint(x: 0, y: pinnedHeight + contentHeight)
+        let pinnedHeight = supplymentaries.reduce(.zero) { max($0, $1.placement.intrinsicPinnedHeight) }
+        let contentHeight = supplymentaries.reduce(.zero) { $0 + $1.placement.intrinsicHeight }
+        pageOrigin = CGPoint(x: 0, y: contentHeight)
         let layout = NonScrollView.Layout(supplementaries: supplymentaries + [
             .customView(configuration: .init(customView: pageViewController.view, placement: .frame({ [unowned self] layoutRef in
-                CGRect(origin: .init(x: 0, y: pageOrigin.y), size: .init(width: layoutRef.width, height: layoutRef.height - pinnedHeight))
-            })))
+                CGRect(origin: .init(x: 0, y: pageOrigin.y), size: .init(width: layoutRef.width, height: layoutRef.height))
+            }))),
         ]) { [unowned self] layoutRef in
             if let scrollView = currentScrollView {
                 return .init(
                     width: layoutRef.width,
-                    height: scrollView.contentSize.height + scrollView.contentInset.top + scrollView.contentInset.bottom + contentHeight + scrollView.adjustedContentInset.top + scrollView.adjustedContentInset.bottom
+                    height: scrollView.contentSize.height + scrollView.contentInset.top + scrollView.contentInset.bottom + scrollView.safeAreaInsets.top + scrollView.safeAreaInsets.bottom + contentHeight
                 )
             }
             return .init(width: layoutRef.width, height: layoutRef.height + contentHeight)

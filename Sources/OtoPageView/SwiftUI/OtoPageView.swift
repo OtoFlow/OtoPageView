@@ -8,25 +8,52 @@
 import SwiftUI
 @_spi(Advanced) import SwiftUIIntrospect
 
+public enum PageType {
+
+    case SwiftUI(_ view: () -> any View)
+
+    case UIKit(_ viewController: () -> PageScrollableController)
+}
+
 public struct OtoPageView<Header: View>: UIViewControllerRepresentable {
 
-    var pages: [any View]
+    var pages: [PageType]
 
     var header: Header
 
     var headerHeight: CGFloat
 
-    public init(pages: [any View], @ViewBuilder header: () -> Header, headerHeight: CGFloat) {
+    var supplymentaries: [NonScrollView.Supplementary]
+
+    public init(
+        pages: [any View],
+        @ViewBuilder header: () -> Header,
+        headerHeight: CGFloat,
+        supplymentaries: [NonScrollView.Supplementary] = []
+    ) {
+        self.pages = pages.map { page in .SwiftUI { page } }
+        self.header = header()
+        self.headerHeight = headerHeight
+        self.supplymentaries = supplymentaries
+    }
+
+    public init(
+        pages: [PageType],
+        @ViewBuilder header: () -> Header,
+        headerHeight: CGFloat,
+        supplymentaries: [NonScrollView.Supplementary] = []
+    ) {
         self.pages = pages
         self.header = header()
         self.headerHeight = headerHeight
+        self.supplymentaries = supplymentaries
     }
 
     public func makeUIViewController(context: Context) -> OtoPageViewController {
-        let pageViewController = OtoPageViewController(
-            header: HostingView(rootView: header.ignoresSafeArea()),
-            height: headerHeight
-        )
+        let supplymentaries = [
+            .header(HostingView(rootView: header.ignoresSafeArea()), height: headerHeight),
+        ] + supplymentaries
+        let pageViewController = OtoPageViewController(supplymentaries: supplymentaries)
         pageViewController.mainScrollView.contentInsetAdjustmentBehavior = .never
         pageViewController.delegate = context.coordinator
         pageViewController.dataSource = context.coordinator
@@ -60,10 +87,15 @@ extension OtoPageView {
 
         init(_ parent: OtoPageView) {
             self.parent = parent
-            self.viewControllers = parent.pages.map { content in
-                PageHostingController(contentView: PageContentView {
-                    AnyView(content.ignoresSafeArea(.all, edges: .top))
-                })
+            self.viewControllers = parent.pages.map { page in
+                switch page {
+                case .SwiftUI(let view):
+                    return PageHostingController(contentView: PageContentView {
+                        AnyView(view().ignoresSafeArea(.all, edges: .top))
+                    })
+                case .UIKit(let viewController):
+                    return viewController()
+                }
             }
         }
 

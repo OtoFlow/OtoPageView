@@ -22,6 +22,7 @@ open class NonScrollView: UIScrollView {
     var layoutRef: LayoutRef {
         .init(
             contentOffset: contentOffset,
+            adjustedContentInset: superview?.safeAreaInsets ?? adjustedContentInset,
             size: bounds.size
         )
     }
@@ -39,14 +40,25 @@ open class NonScrollView: UIScrollView {
     }
 
     open func invalidateLayout() {
+        layout.supplementaries.forEach { supplementary in
+            switch supplementary.placement {
+            case .pinnedTop, .topSafeArea:
+                bringSubviewToFront(supplementary.view)
+            default: ()
+            }
+        }
         contentSize = layout.contentSizeMaker(layoutRef)
     }
 
     open override func layoutSubviews() {
         super.layoutSubviews()
 
+        var originRef: CGPoint = .zero
         layout.supplementaries.forEach { supplementary in
-            supplementary.view.frame = supplementary.placement.frame(applying: layoutRef)
+            supplementary.view.frame = supplementary.placement.frame(applying: layoutRef, originRef: originRef)
+            if case .header = supplementary.placement {
+                originRef.y = supplementary.view.frame.maxY
+            }
         }
     }
 }
@@ -97,6 +109,8 @@ extension NonScrollView {
 
         public let contentOffset: CGPoint
 
+        public let adjustedContentInset: UIEdgeInsets
+
         public let size: CGSize
 
         public var width: CGFloat {
@@ -117,9 +131,38 @@ extension NonScrollView {
             case customView(UIView)
         }
 
+        public enum Distribution {
+
+            case none
+
+            case below([SupplementaryType])
+
+            public static func below(_ supplementaries: SupplementaryType...) -> Self {
+                .below(supplementaries)
+            }
+        }
+
+        public enum Alignment {
+
+            case stretch
+
+            case center
+
+            case leading
+
+            case trailing
+        }
+
         public enum Placement {
 
-            case pinnedTop(size: CGSize, alignment: Alignment = .center)
+            case pinnedTop(
+                size: CGSize,
+                distribution: Distribution = .none,
+                alignment: Alignment = .stretch,
+                shouldIgnoreSafeArea: Bool = false
+            )
+
+            case topSafeArea(shouldStretch: Bool, opacityChanged: ((_ opacity: Double) -> ())? = nil)
 
             case header(height: CGFloat, frameMaker: (_ layoutRef: LayoutRef) -> CGRect)
 
@@ -127,7 +170,7 @@ extension NonScrollView {
 
             var intrinsicPinnedHeight: CGFloat {
                 switch self {
-                case .pinnedTop(let size, _):
+                case .pinnedTop(let size, _, _, _):
                     return size.height
                 default:
                     return 0.0
@@ -136,6 +179,8 @@ extension NonScrollView {
 
             var intrinsicHeight: CGFloat {
                 switch self {
+                case .pinnedTop(let size, _, _, _):
+                    return size.height
                 case .header(let height, _):
                     return height
                 default:
@@ -143,23 +188,43 @@ extension NonScrollView {
                 }
             }
 
-            func frame(applying layoutRef: NonScrollView.LayoutRef) -> CGRect {
+            func frame(applying layoutRef: NonScrollView.LayoutRef, originRef: CGPoint = .zero) -> CGRect {
                 switch self {
-                case .pinnedTop(let size, let alignment):
-                    return CGRect(origin: .init(x: (layoutRef.width - size.width) / 2, y: 0), size: size)
+                case .pinnedTop(let size, let distribution, let alignment, let shouldIgnoreSafeArea):
+                    var frame: CGRect
+                    switch alignment {
+                    case .stretch:
+                        frame = .init(x: 0, y: layoutRef.contentOffset.y, width: layoutRef.width, height: size.height)
+                    case .center:
+                        frame = .init(origin: .init(x: (layoutRef.width - size.width) / 2, y: layoutRef.contentOffset.y), size: size)
+                    case .leading:
+                        frame = .init(origin: layoutRef.contentOffset, size: size)
+                    case .trailing:
+                        frame = .init(origin: .init(x: layoutRef.width - size.width, y: layoutRef.contentOffset.y), size: size)
+                    }
+
+                    if !shouldIgnoreSafeArea {
+                        frame.origin.y += layoutRef.adjustedContentInset.top
+                    }
+
+                    if case .below = distribution {
+                        frame.origin.y = max(frame.origin.y, originRef.y)
+                    }
+
+                    return frame
+                case .topSafeArea(let shouldStretch, let opacityChanged):
+                    let frame = CGRect(
+                        x: 0,
+                        y: layoutRef.contentOffset.y,
+                        width: layoutRef.width,
+                        height: shouldStretch ? max(layoutRef.adjustedContentInset.top, originRef.y - layoutRef.contentOffset.y) : layoutRef.adjustedContentInset.top
+                    )
+                    opacityChanged?(1.0 - max(0, min(1, (frame.height - layoutRef.adjustedContentInset.top) / layoutRef.adjustedContentInset.top)))
+                    return frame
                 case .header(_, let frameMaker), .frame(let frameMaker):
                     return frameMaker(layoutRef)
                 }
             }
-        }
-
-        public enum Alignment {
-
-            case leading
-
-            case trailing
-
-            case center
         }
 
         public struct CustomViewConfiguration {
@@ -178,15 +243,45 @@ extension NonScrollView {
             self.placement = placement
         }
 
+        /// Placing a custom view as the header that scrolls with the main scroll view.
+        /// - Parameters:
+        ///   - header: The custom header view.
+        ///   - height: The height of the header.
+        /// - Returns: The supplementary configuration.
         public static func header(_ header: UIView, height: CGFloat) -> Supplementary {
             .init(
                 view: header,
-                placement: .header(height: height, frameMaker: { layoutRef in
+                placement: .header(height: height) { layoutRef in
                     CGRect(origin: .zero, size: .init(width: layoutRef.width, height: height))
-                })
+                }
             )
         }
 
+        /// Placing a custom view pinned at the top of the safe area.
+        /// - Parameters:
+        ///   - view: The custom view, by default, is a blur effect view.
+        ///   - shouldStretch: Should the view stretch to fill the header supplementary views.
+        ///   - opacityChanged: The calculated opacity during layout subviews has changed.
+        /// - Returns: The supplementary configuration.
+        public static func topSafeArea(
+            view: UIView = UIVisualEffectView(effect: UIBlurEffect(style: .regular)),
+            shouldStretch: Bool = true,
+            opacityChanged: ((_ view: UIView, _ opacity: Double) -> ())? = nil
+        ) -> Supplementary {
+            .init(
+                view: view,
+                placement: .topSafeArea(
+                    shouldStretch: shouldStretch,
+                    opacityChanged: opacityChanged.map { closure in 
+                        { opacity in closure(view, opacity) }
+                    }
+                )
+            )
+        }
+
+        /// Placing a custom view with configuration.
+        /// - Parameter configuration: The custom view configuration.
+        /// - Returns: The supplementary configuration.
         public static func customView(configuration: CustomViewConfiguration) -> Supplementary {
             .init(
                 view: configuration.customView,
