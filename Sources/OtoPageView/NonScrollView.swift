@@ -264,7 +264,21 @@ extension NonScrollView {
         ///   - opacityChanged: The calculated opacity during layout subviews has changed.
         /// - Returns: The supplementary configuration.
         public static func topSafeArea(
-            view: UIView = UIVisualEffectView(effect: UIBlurEffect(style: .regular)),
+            view: UIView = {
+                let navigationBar = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
+                let separator = UIView()
+                separator.backgroundColor = .separator
+                separator.translatesAutoresizingMaskIntoConstraints = false
+                let displayPixel = 1.0 / max(1.0, UITraitCollection.current.displayScale)
+                navigationBar.contentView.addSubview(separator)
+                NSLayoutConstraint.activate([
+                    separator.topAnchor.constraint(equalTo: navigationBar.bottomAnchor),
+                    separator.leadingAnchor.constraint(equalTo: navigationBar.leadingAnchor),
+                    separator.trailingAnchor.constraint(equalTo: navigationBar.trailingAnchor),
+                    separator.heightAnchor.constraint(equalToConstant: displayPixel),
+                ])
+                return navigationBar
+            }(),
             shouldStretch: Bool = true,
             opacityChanged: ((_ view: UIView, _ opacity: Double) -> ())? = nil
         ) -> Supplementary {

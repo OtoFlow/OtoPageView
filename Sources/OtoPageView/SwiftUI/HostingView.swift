@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-class HostingView<Content: View>: UIView {
+public final class HostingView<Content: View>: UIView {
 
     private var hostingViewController: UIHostingController<Content>
 
-    init(rootView: Content, frame: CGRect = .zero) {
+    public init(rootView: Content, frame: CGRect = .zero) {
         hostingViewController = UIHostingController(rootView: rootView)
 
         super.init(frame: frame)

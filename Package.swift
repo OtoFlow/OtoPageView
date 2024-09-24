@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "OtoPageView", targets: ["OtoPageView"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/siteline/swiftui-introspect", from: "1.0.0"),
+        .package(url: "https://github.com/siteline/swiftui-introspect", from: "1.2.0"),
     ],
     targets: [
         .target(

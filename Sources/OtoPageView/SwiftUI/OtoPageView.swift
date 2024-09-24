@@ -57,12 +57,13 @@ public struct OtoPageView<Header: View>: UIViewControllerRepresentable {
         pageViewController.mainScrollView.contentInsetAdjustmentBehavior = .never
         pageViewController.delegate = context.coordinator
         pageViewController.dataSource = context.coordinator
+
+        pageViewController.setViewController(context.coordinator.viewControllers[0], direction: .forward, animated: true)
+
         return pageViewController
     }
 
     public func updateUIViewController(_ pageViewController: OtoPageViewController, context: Context) {
-        pageViewController.setViewController(context.coordinator.viewControllers[0], direction: .forward, animated: true)
-
         if let navigationController = pageViewController.navigationController,
            let targets = navigationController.interactivePopGestureRecognizer?.value(forKey: "targets") as? NSMutableArray {
             let recognzier = UIPanGestureRecognizer()
@@ -131,7 +132,7 @@ struct PageContentView<Content: View>: View {
 
     var body: some View {
         content
-            .introspect(.scrollView, on: .iOS(.v14, .v15, .v16, .v17)) { scrollView in
+            .introspect(.scrollView, on: .iOS(.v14, .v15, .v16, .v17, .v18)) { scrollView in
                 scrollView.isScrollEnabled = false
                 self.scrollView = scrollView
             }
