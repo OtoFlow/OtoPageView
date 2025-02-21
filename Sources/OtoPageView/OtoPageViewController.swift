@@ -8,12 +8,10 @@
 import UIKit
 
 public protocol PageScrollableController: UIViewController {
-
     var scrollableView: UIScrollView? { get }
 }
 
 open class OtoPageViewController: UIViewController {
-
     public lazy var mainScrollView: NonScrollView = {
         let pinnedHeight = supplymentaries.reduce(.zero) { max($0, $1.placement.intrinsicPinnedHeight) }
         let contentHeight = supplymentaries.reduce(.zero) { $0 + $1.placement.intrinsicHeight }
@@ -46,7 +44,6 @@ open class OtoPageViewController: UIViewController {
             }
         }
         scrollView.alwaysBounceVertical = true
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
         return scrollView
     }()
 
@@ -66,6 +63,12 @@ open class OtoPageViewController: UIViewController {
         vc.dataSource = self
         return vc
     }()
+
+    public var isGestureBasedNavigationEnabled: Bool = true {
+        didSet {
+            pageViewController.dataSource = isGestureBasedNavigationEnabled ? self : nil
+        }
+    }
 
     public var pageScrollView: UIScrollView? {
         for case let scrollView as UIScrollView in pageViewController.view.subviews {
@@ -102,14 +105,18 @@ open class OtoPageViewController: UIViewController {
     open override func viewDidLoad() {
         super.viewDidLoad()
 
-        view.addSubview(mainScrollView)
+        addChild(pageViewController)
 
+        view.addSubview(mainScrollView)
+        mainScrollView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             mainScrollView.topAnchor.constraint(equalTo: view.topAnchor),
             mainScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             mainScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             mainScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
+
+        pageViewController.didMove(toParent: self)
     }
 
     open func setViewController(
@@ -146,13 +153,11 @@ open class OtoPageViewController: UIViewController {
 }
 
 extension OtoPageViewController {
-
     public protocol Delegate: AnyObject {
 
     }
 
     public protocol DataSource: AnyObject {
-
         func pageViewController(_ pageViewController: OtoPageViewController, viewControllerBefore viewController: UIViewController) -> UIViewController?
 
         func pageViewController(_ pageViewController: OtoPageViewController, viewControllerAfter viewController: UIViewController) -> UIViewController?
@@ -160,7 +165,6 @@ extension OtoPageViewController {
 }
 
 extension OtoPageViewController: UIPageViewControllerDelegate {
-
     public func pageViewController(_ pageViewController: UIPageViewController, didFinishAnimating finished: Bool, previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
         for case let vc as PageScrollableController in pageViewController.viewControllers ?? [] {
             DispatchQueue.main.async {
@@ -173,7 +177,6 @@ extension OtoPageViewController: UIPageViewControllerDelegate {
 }
 
 extension OtoPageViewController: UIPageViewControllerDataSource {
-
     public func pageViewController(_ pageViewController: UIPageViewController, viewControllerBefore viewController: UIViewController) -> UIViewController? {
         dataSource?.pageViewController(self, viewControllerBefore: viewController)
     }
@@ -184,7 +187,6 @@ extension OtoPageViewController: UIPageViewControllerDataSource {
 }
 
 extension OtoPageViewController: UIGestureRecognizerDelegate {
-
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let panGestureRecognizer = gestureRecognizer as? UIPanGestureRecognizer,
               let dataSource = dataSource
